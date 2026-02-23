@@ -3,16 +3,22 @@
 
 #include "Arduino.h"
 
+typedef enum 
+{
+    COMPUTER_SERIAL_OK,
+    COMPUTER_SERIAL_ERROR,
+    COMPUTER_SERIAL_NOT_INIT,
+} en_computer_serial_error_msg;
 
-void computer_serial_init(void);
+en_computer_serial_error_msg computer_serial_init(void);
 
 /* Used to write to the Serial */
-int computer_serial_write(const uint8_t *bytes_to_write, uint8_t size_to_write);
-void computer_serial_print(const char* buffer);
+en_computer_serial_error_msg computer_serial_write(const uint8_t *bytes_to_write, uint8_t size_to_write);
+en_computer_serial_error_msg computer_serial_print(const char* buffer, ...);
 
 /* Used to read from the Serial */
-int computer_serial_read(uint8_t *i_buffer, uint8_t size_to_read);
+int computer_serial_read_line(uint8_t *i_buffer, uint8_t size_to_read);
 
-int computer_serial_empty_buffer(void);
+en_computer_serial_error_msg computer_serial_empty_buffer(void);
 
 #endif /* COMPUTER_SERIAL_H__ */

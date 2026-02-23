@@ -1,5 +1,6 @@
 #include "protocol/at89c51rb2_isp.h"
 #include "drivers/mcu_serial.h"
+#include "utils/logger.h"
 
 #define DELAY_FOR_STABILITY 5000
 #define DELAY_BOOTTIME 10000
@@ -67,37 +68,40 @@ uint8_t ascii_to_byte(const char *in) {
     return (high << 4) | low;
 }
 
-static int at89c51rb2_write_and_check(const uint8_t *buffer, uint8_t size)
+static en_at89c51rb2_isp_error_msg at89c51rb2_write_and_check(const uint8_t *buffer, uint8_t size)
 {
-    int err = 0;
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
+    en_mcu_serial_error_msg err = MCU_SERIAL_OK;
     for (int i = 0; i < size; i++)
     {
         /* Write to MCU */
         err = mcu_serial_write(&buffer[i], 1);
-        if (0 != err)
+        if (MCU_SERIAL_OK != err)
         {
-            Serial.println("Failed to write mcu");
+            ret = AT89C51RB2_ISP_ERROR;
+            log_error("Failed to write to mcu from write_and_check");
             break;
         }
 
         uint8_t echo;
-        err = mcu_serial_read(&echo, 1);
-        if (0 != err)
+        int byte_read = mcu_serial_read(&echo, 1);
+        if (1 != byte_read)
         {
-            Serial.println("Failed to read mcu");
+            ret = AT89C51RB2_ISP_ERROR;
+            log_error("Failed read back from mcu from write_and_check");
             break;
         }
         if (echo != buffer[i])
         {
-            Serial.print("Not the same: ");
-            Serial.print(buffer[i]);
-            Serial.println(echo);
-            err = -1;
+            ret = AT89C51RB2_ISP_ERROR;
+            log_error("Failed echo from write_and_check\n");
+            log_debug("ECHO VALUE == %d\n", echo);
+            log_debug("REAL VALUE == %d\n", buffer[i]);
             break;
         }
     }
 
-    if (0 == err)
+    if (MCU_SERIAL_OK == err)
     {
         /* Check the status */
         uint8_t status;
@@ -112,9 +116,6 @@ static int at89c51rb2_write_and_check(const uint8_t *buffer, uint8_t size)
         bool status_error   = ('X' == status || 'L' == status || 'P' == status); 
         bool status_ok      = ('.' == status);
 
-        Serial.print("Peek values is == ");
-        Serial.println(status);
-
         if (status_error || status_ok)
         {
             /* We empty the buffer ('X' + 'CR+LF')*/
@@ -122,12 +123,22 @@ static int at89c51rb2_write_and_check(const uint8_t *buffer, uint8_t size)
         }
         
         /* err will be != 0 if status_error is true */
-        err = status_error;
+        if (status_error)
+        {
+            ret = AT89C51RB2_ISP_ERROR;
+            log_error("status error write_and_check");
+        }
     }
-    return err;
+
+    if (MCU_SERIAL_OK != err)
+    {
+        ret = AT89C51RB2_ISP_ERROR;
+    }
+
+    return ret;
 }
 
-static int at89c51rb2_create_frame_header_and_write(const uint8_t *buffer,
+static en_at89c51rb2_isp_error_msg at89c51rb2_create_frame_header_and_write(const uint8_t *buffer,
                                          uint8_t size,
                                          uint16_t address)
 {
@@ -170,7 +181,7 @@ static void delay_without_cpu_stop(unsigned long ms)
 }
 
 /* Bootloader control */
-int at89c51rb2_enter_bootloader(void)
+en_at89c51rb2_isp_error_msg at89c51rb2_enter_bootloader(void)
 {
     delay_without_cpu_stop(DELAY_BOOTTIME);
 
@@ -203,8 +214,9 @@ int at89c51rb2_enter_bootloader(void)
 
    0 = Bootloader
 */
-int at89c51rb2_finish_flash(void)
+en_at89c51rb2_isp_error_msg at89c51rb2_finish_flash(void)
 {
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     const uint8_t data[] = {
         WRITE_FCT,
         WRITE_FUSE,
@@ -212,7 +224,10 @@ int at89c51rb2_finish_flash(void)
         1
     };
 
-    int err = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
+    if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0))
+    {
+        ret = AT89C51RB2_ISP_ERROR;
+    }
 
     const  uint8_t data2[] = {
         WRITE_FCT,
@@ -221,34 +236,37 @@ int at89c51rb2_finish_flash(void)
         0
     };
 
-    err |= at89c51rb2_create_frame_header_and_write(data2, sizeof(data2), 0);
+    if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data2, sizeof(data2), 0))
+    {
+        ret = AT89C51RB2_ISP_ERROR;
+    }
 
     mcu_serial_empty_buffer();
-    return err;
+    return ret;
 }
 
 /* Erase */
-int at89c51rb2_erase_block(uint8_t block)
+en_at89c51rb2_isp_error_msg at89c51rb2_erase_block(uint8_t block)
 {
     const uint8_t data[] = { WRITE_FCT, ERASE, block };
-    int err = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
+    en_at89c51rb2_isp_error_msg ret = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
     mcu_serial_empty_buffer();
-    return err;
+    return ret;
 }
-int at89c51rb2_full_chip_erase(void)
+en_at89c51rb2_isp_error_msg at89c51rb2_full_chip_erase(void)
 {
     const uint8_t data[] = { WRITE_FCT, FULL_CHIP_ERASE };
-    int err = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
+    en_at89c51rb2_isp_error_msg ret = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
     mcu_serial_empty_buffer();
-    return err;
+    return ret;
 }
 
 /* Programming */
-int at89c51rb2_write_program_data_chunk(const uint8_t *buffer,
+en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *buffer,
                            uint8_t size,
                            uint16_t address)
 {
-    int err = 0;
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     const int MAX_PAGE_SIZE = 128;
     const uint8_t *data = buffer;
 
@@ -262,14 +280,20 @@ int at89c51rb2_write_program_data_chunk(const uint8_t *buffer,
 
         /* Left part */
         /* size * 2 because 1 data is 2 ascii */
-        err = at89c51rb2_write_program_data_chunk(data, size_until_page * 2, address); // TODO: do something with this error
+        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size_until_page * 2, address))
+        {
+            ret = AT89C51RB2_ISP_ERROR;
+        } 
         /* New address */
         address = MAX_PAGE_SIZE * page_pos;
         size    = size - size_until_page;
         data    = &buffer[size_until_page]; // Increase the pointer pos 
         
         /* Right part */
-        err = at89c51rb2_write_program_data_chunk(data, size * 2, address);
+        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size * 2, address))
+        {
+            ret = AT89C51RB2_ISP_ERROR;
+        }
     }
     else 
     {
@@ -278,23 +302,26 @@ int at89c51rb2_write_program_data_chunk(const uint8_t *buffer,
         if (MAX_PAGE_SIZE > size)
         {
             memcpy(&data_processed[1], data, size * 2);
-            err = at89c51rb2_create_frame_header_and_write(data_processed, size * 2, address);
+            if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data_processed, size * 2, address))
+            {
+                ret = AT89C51RB2_ISP_ERROR;
+            }
         }
         else 
         {
-            err = -1;
+            ret = AT89C51RB2_ISP_ERROR;
         }
     }
 
-    return err; 
+    return ret; 
 }
 
-int at89c51rb2_write_program_data(const uint8_t *buffer, uint8_t size)
+en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data(const uint8_t *buffer, uint8_t size)
 {
-    int err = 0;
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     if (0 == size || NULL == buffer)
     {
-        return -1;
+        return AT89C51RB2_ISP_ERROR;
     }
 
     int offset = 0;
@@ -302,7 +329,6 @@ int at89c51rb2_write_program_data(const uint8_t *buffer, uint8_t size)
     {
         if (':' != buffer[offset + 0])
         {
-            err = -1;
             break;
         }
 
@@ -312,91 +338,112 @@ int at89c51rb2_write_program_data(const uint8_t *buffer, uint8_t size)
         uint16_t address = (((uint16_t)address_msb << 8) | (uint16_t)address_lsb);
 
         const uint8_t *data = &buffer[offset + 9];
-
+        
         /* byte_count * 2 because one data is 2 ascii */
-        at89c51rb2_write_program_data_chunk(data, byte_count * 2, address);
-
-        offset += 9 + byte_count * 2 + 2; // header + data + checksum
-    }
-}
-
-/* Reading */
-int at89c51rb2_read_data(uint8_t *buffer, uint8_t size)
-{
-    int err = 0;
-
-    int index_buffer = 0;
-    while (index_buffer < size) 
-    {
-        uint8_t b;
-        int read_status = mcu_serial_read(&b, 1);
-        if (0 != read_status)
+        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, byte_count * 2, address))
         {
+            ret = AT89C51RB2_ISP_ERROR;
             break;
         }
 
-        buffer[index_buffer++] = b;
-    } 
-    Serial.println("EMpty buffer");
-    mcu_serial_empty_buffer();
-    Serial.println("buffer empty");
-    return err;
+        offset += 9 + byte_count * 2 + 2; // header + data + checksum
+    }
+
+    return ret;
 }
-int at89c51rb2_read_id(uint8_t buffer[2])
+
+/* Reading */
+en_at89c51rb2_isp_error_msg at89c51rb2_read_data(uint8_t *buffer, uint8_t size)
 {
-    int err = 0;
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
+
+    int index_buffer = 0;
+    int read_bytes = mcu_serial_read(buffer, size);
+    if (read_bytes < size)
+    {
+        buffer[read_bytes] = '\0';
+    }
+
+    mcu_serial_empty_buffer();
+    return ret;
+}
+en_at89c51rb2_isp_error_msg at89c51rb2_read_id(uint8_t buffer[2])
+{
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     const uint8_t data[] = { READ_FCT, READ_IDs, READ_MANUFACTURER_ID };
-    err = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
-
-    if (0 == err)
+    if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0))
     {
-        err = at89c51rb2_read_data(buffer, 2);
+        ret = AT89C51RB2_ISP_ERROR;
+    }
+
+    if (AT89C51RB2_ISP_OK == ret)
+    {
+        if (AT89C51RB2_ISP_OK != at89c51rb2_read_data(buffer, 2))
+        {
+            ret = AT89C51RB2_ISP_ERROR;
+        }
     }
 
     mcu_serial_empty_buffer();
-    return err;
+    return ret;
 }
-int at89c51rb2_read_ssb(uint8_t buffer[2])
+en_at89c51rb2_isp_error_msg at89c51rb2_read_ssb(uint8_t buffer[2])
 {
-    int err = 0;
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     const byte data[] = { READ_FCT, READ_SECURITY_BYTE, READ_SSB };
-    err = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
-
-    if (0 == err)
+    if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0))
     {
-        err = at89c51rb2_read_data(buffer, 2);
+        ret = AT89C51RB2_ISP_ERROR;
+    }
+
+    if (AT89C51RB2_ISP_OK == ret)
+    {
+        if (AT89C51RB2_ISP_OK != at89c51rb2_read_data(buffer, 2))
+        {
+            ret = AT89C51RB2_ISP_ERROR;
+        }
     }
     mcu_serial_empty_buffer();
-    return err;
+    return ret;
 }
-int at89c51rb2_read_hardware_bytes(uint8_t buffer[4])
+en_at89c51rb2_isp_error_msg at89c51rb2_read_hardware_bytes(uint8_t buffer[4])
 {
-    int err = 0;
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     const uint8_t data_hardware_byte[] = {
         READ_FCT,
         READ_HARDWARE_BYTE1,
         READ_HARDWARE_BYTE2
     };
-    err |= at89c51rb2_create_frame_header_and_write(data_hardware_byte, sizeof(data_hardware_byte), 0);
+    if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data_hardware_byte, sizeof(data_hardware_byte), 0))
+    {
+        ret = AT89C51RB2_ISP_ERROR;
+    }
 
     const uint8_t data_bsb_byte[] = {
         READ_FCT,
         READ_SECURITY_BYTE,
         READ_BSB
     };
-    err |= at89c51rb2_create_frame_header_and_write(data_bsb_byte, sizeof(data_bsb_byte), 0);
-
-    if (0 == err)
+    if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data_bsb_byte, sizeof(data_bsb_byte), 0))
     {
-        err = at89c51rb2_read_data(buffer, 4);
+        ret = AT89C51RB2_ISP_ERROR;
+    }
+
+    if (AT89C51RB2_ISP_OK == ret)
+    {
+        if (AT89C51RB2_ISP_OK != at89c51rb2_read_data(buffer, 4))
+        {
+            ret = AT89C51RB2_ISP_ERROR;
+        }
     }
 
     mcu_serial_empty_buffer();
-    return err;
+    return ret;
 }
 
-int at89c51rb2_display_memory(const char start_address[4], const char end_address[4], uint8_t *i_buffer, int size_buffer)
+en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[4], const char end_address[4], uint8_t *i_buffer, int size_buffer)
 {
+    en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     uint8_t start_address_byte[2] = { ascii_to_byte(&start_address[0]), ascii_to_byte(&start_address[2]) };
     uint8_t end_address_byte[2] = { ascii_to_byte(&end_address[0]), ascii_to_byte(&end_address[2]) };
 
@@ -407,18 +454,22 @@ int at89c51rb2_display_memory(const char start_address[4], const char end_addres
       DISPLAY_DATA
     };
 
-    int err = at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0);
-    Serial.println("DAta written");
-
-    if (0 == err)
+    if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0))
     {
-        Serial.println("DAta to read");
-      err = at89c51rb2_read_data(i_buffer, size_buffer);
-        Serial.println("DAta read");
+        Serial.println("Failed to create and write to MCU");
+        ret = AT89C51RB2_ISP_ERROR;
     }
-    Serial.println("Finish");
+
+    if (AT89C51RB2_ISP_OK == ret)
+    {
+        if (AT89C51RB2_ISP_OK != at89c51rb2_read_data(i_buffer, size_buffer))
+        {
+            ret = AT89C51RB2_ISP_ERROR;
+            Serial.println("Failed to data from MCU");
+        }
+    }
 
     mcu_serial_empty_buffer();
 
-    return err;
+    return ret;
 }
