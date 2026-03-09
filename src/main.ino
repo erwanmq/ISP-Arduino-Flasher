@@ -8,6 +8,7 @@ void setup ()
 {
   logger_init(LOG_DEBUG);
   computer_serial_init();
+  Serial.println("Test");
   computer_serial_print("Computer communication initialized\n");
   mcu_serial_init();
   computer_serial_print("MCU communication initialized\n");

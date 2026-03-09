@@ -84,11 +84,12 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_write_and_check(const uint8_t *buf
         }
 
         uint8_t echo;
-        int byte_read = mcu_serial_read(&echo, 1);
-        if (1 != byte_read)
+        uint8_t byte_read = 0;
+        err = mcu_serial_read(&echo, 1, &byte_read);
+        if (MCU_SERIAL_OK != err || 1 != byte_read)
         {
             ret = AT89C51RB2_ISP_ERROR;
-            log_error("Failed read back from mcu from write_and_check");
+            log_error("Failed read back from mcu from write_and_check. Error: %d\n", (int)err);
             break;
         }
         if (echo != buffer[i])
@@ -119,7 +120,8 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_write_and_check(const uint8_t *buf
         if (status_error || status_ok)
         {
             /* We empty the buffer ('X' + 'CR+LF')*/
-            mcu_serial_read(NULL, 3); // discard 3 char
+            uint8_t discard_read = 0;
+            err = mcu_serial_read(NULL, 3, &discard_read); // discard 3 char
         }
         
         /* err will be != 0 if status_error is true */
@@ -143,7 +145,7 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_create_frame_header_and_write(cons
                                          uint16_t address)
 {
     const uint8_t record_mark = ':';
-    uint8_t address_8bits[2] = { (address >> 8) & 0x0F, address & 0x0F };
+    uint8_t address_8bits[2] = { ((uint8_t)address >> 8) & 0x0F, (uint8_t)address & 0x0F };
 
     uint8_t reclen = size - 1; // We don't count the command
     uint8_t checksum = 0;
@@ -357,9 +359,13 @@ en_at89c51rb2_isp_error_msg at89c51rb2_read_data(uint8_t *buffer, uint8_t size)
 {
     en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
 
-    int index_buffer = 0;
-    int read_bytes = mcu_serial_read(buffer, size);
-    if (read_bytes < size)
+    uint8_t read_bytes = 0;
+    en_mcu_serial_error_msg err = mcu_serial_read(buffer, size, &read_bytes);
+    if (MCU_SERIAL_OK != err)
+    {
+        ret = AT89C51RB2_ISP_ERROR;
+    }
+    else if (read_bytes < size)
     {
         buffer[read_bytes] = '\0';
     }

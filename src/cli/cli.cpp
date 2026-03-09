@@ -1,6 +1,7 @@
 #include "cli/cli.h"
 #include "drivers/computer_serial.h"
 #include "protocol/at89c51rb2_isp.h"
+#include "utils/logger.h"
 
 #include <stdio.h>
 
@@ -173,20 +174,25 @@ en_cli_error_msg cli_display_memory(void)
 
     char start_address[4];
     char end_address[4];
+    int byte_read = 0;
     computer_serial_print("Enter the start address MSB: \n");
-    computer_serial_read_line((uint8_t*)start_address, 2);
+    byte_read = computer_serial_read_line((uint8_t*)start_address, 2);
+    log_debug("Bytes read for start_address[0] = %d\n", byte_read);
     computer_serial_empty_buffer();
     
     computer_serial_print("Enter the start address LSB: \n");
-    computer_serial_read_line((uint8_t*)&start_address[2], 2);
+    byte_read = computer_serial_read_line((uint8_t*)&start_address[2], 2);
+    log_debug("Bytes read for start_address[1] = %d\n", byte_read);
     computer_serial_empty_buffer();
 
     computer_serial_print("Enter the end address MSB: \n");
-    computer_serial_read_line((uint8_t*)end_address, 2);
+    byte_read = computer_serial_read_line((uint8_t*)end_address, 2);
+    log_debug("Bytes read for end_address[0] = %d\n", byte_read);
     computer_serial_empty_buffer();
 
     computer_serial_print("Enter the end address LSB: \n");
-    computer_serial_read_line((uint8_t*)&end_address[2], 2);
+    byte_read = computer_serial_read_line((uint8_t*)&end_address[2], 2);
+    log_debug("Bytes read for end_address[1] = %d\n", byte_read);
     computer_serial_empty_buffer();
 
     uint8_t buffer[128];

@@ -31,7 +31,10 @@ static en_mcu_serial_error_msg mcu_serial_wait_for_answer(void)
     }
 
     const unsigned long start = micros();
-    while ((!mcuSerial.available()) && (micros() - start < TIMER_MCU_ANSWER));
+    while ((!mcuSerial.available()) && (micros() - start < TIMER_MCU_ANSWER))
+    {
+        delayMicroseconds(100);
+    }
 
     if (!mcuSerial.available())
     {
@@ -60,12 +63,17 @@ en_mcu_serial_error_msg mcu_serial_write(const uint8_t *bytes_to_write, uint8_t 
     return err;
 }
 
-int mcu_serial_read(uint8_t *i_buffer, uint8_t size_to_read)
+en_mcu_serial_error_msg mcu_serial_read(uint8_t *i_buffer, uint8_t size_to_read, uint8_t *size_read)
 {
     /* Wait for a response */
     if (false == mcu_serial_initialized)
     {
         return MCU_SERIAL_NOT_INIT;
+    }
+
+    if (0 == size_to_read)
+    {
+        return MCU_SERIAL_OK;
     }
 
     en_mcu_serial_error_msg wait = mcu_serial_wait_for_answer();
@@ -80,8 +88,9 @@ int mcu_serial_read(uint8_t *i_buffer, uint8_t size_to_read)
                 i_buffer[data_read++] = b;
             }
         }
+        *size_read = data_read;
     }
-    return data_read;
+    return wait;
 }
 
 en_mcu_serial_error_msg mcu_serial_peek(uint8_t* i_buffer)
@@ -112,6 +121,9 @@ en_mcu_serial_error_msg mcu_serial_empty_buffer(void)
         return MCU_SERIAL_NOT_INIT;
     }
 
-    mcuSerial.readStringUntil('\n');
+    while (mcuSerial.available())
+    {
+        mcuSerial.read();
+    }
     return err;
 }
