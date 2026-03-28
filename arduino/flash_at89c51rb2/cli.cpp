@@ -150,17 +150,16 @@ en_cli_error_msg cli_full_chip_erase(void)
     return ret;
 }
 
+
 en_cli_error_msg cli_program_data(void)
 {
     en_cli_error_msg ret = CLI_OK;
 
     computer_serial_print("Enter your hex intel data in one row with the semicolon: ");
 
-    uint8_t program_data[128] = { 0 };
+    uint8_t program_data[64] = { 0 };
     int size = computer_serial_read_line(program_data, sizeof(program_data));
     computer_serial_empty_buffer();
-
-    program_data[size] = '\0';
 
     if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data(program_data, size))
     {
