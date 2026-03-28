@@ -87,6 +87,7 @@ en_mcu_serial_error_msg mcu_serial_read(uint8_t *i_buffer, uint8_t size_to_read,
             {
                 i_buffer[data_read++] = b;
             }
+            delay(10);
         }
         *size_read = data_read;
     }

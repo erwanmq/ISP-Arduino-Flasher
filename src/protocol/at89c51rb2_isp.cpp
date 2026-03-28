@@ -268,6 +268,9 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *b
                            uint8_t size,
                            uint16_t address)
 {
+    Serial.println("Data chunk");
+
+    delay(20);
     en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     const int MAX_PAGE_SIZE = 128;
     const uint8_t *data = buffer;
@@ -331,6 +334,7 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data(const uint8_t *buffer,
     {
         if (':' != buffer[offset + 0])
         {
+            Serial.print("Break\n");
             break;
         }
 
@@ -340,13 +344,17 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data(const uint8_t *buffer,
         uint16_t address = (((uint16_t)address_msb << 8) | (uint16_t)address_lsb);
 
         const uint8_t *data = &buffer[offset + 9];
-        
+        int free_memory = freeMemory();
+        Serial.print("Memory == ");
+        Serial.println(free_memory);
         /* byte_count * 2 because one data is 2 ascii */
         if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, byte_count * 2, address))
         {
+            Serial.print("Write data chunk fail\n");
             ret = AT89C51RB2_ISP_ERROR;
             break;
         }
+        Serial.print("Increase offset\n");
 
         offset += 9 + byte_count * 2 + 2; // header + data + checksum
     }
@@ -365,10 +373,8 @@ en_at89c51rb2_isp_error_msg at89c51rb2_read_data(uint8_t *buffer, uint8_t size)
     {
         ret = AT89C51RB2_ISP_ERROR;
     }
-    else if (read_bytes < size)
-    {
-        buffer[read_bytes] = '\0';
-    }
+    
+    buffer[read_bytes] = '\0';
 
     mcu_serial_empty_buffer();
     return ret;
@@ -462,7 +468,7 @@ en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[4
 
     if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0))
     {
-        Serial.println("Failed to create and write to MCU");
+        log_error("Failed to create and write to MCU\n");
         ret = AT89C51RB2_ISP_ERROR;
     }
 
@@ -471,7 +477,7 @@ en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[4
         if (AT89C51RB2_ISP_OK != at89c51rb2_read_data(i_buffer, size_buffer))
         {
             ret = AT89C51RB2_ISP_ERROR;
-            Serial.println("Failed to data from MCU");
+            log_error("Failed to data from MCU\n");
         }
     }
 

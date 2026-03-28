@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#define COMPUTER_BAUDRATE 19200
+#define COMPUTER_BAUDRATE 9600
 
 static bool computer_serial_initialized = false;
 
@@ -49,12 +49,9 @@ en_computer_serial_error_msg computer_serial_write(const uint8_t *bytes_to_write
     return err;
 }
 
-static en_computer_serial_error_msg computer_serial_vprint(const char* buffer, ...)
+static en_computer_serial_error_msg computer_serial_vprint(const char* buffer, va_list args)
 {
     CHECK_INIT();
-
-    va_list args;
-    va_start(args, buffer);
 
     while(*buffer) {
         if ('%' == *buffer)
@@ -70,6 +67,11 @@ static en_computer_serial_error_msg computer_serial_vprint(const char* buffer, .
                 char *s = va_arg(args, char*);
                 Serial.print(s);
             }
+            else if ('c' == *buffer)
+            {
+                int c = va_arg(args, int);
+                Serial.print((char)c);
+            }
         }
         else 
         {
@@ -78,9 +80,15 @@ static en_computer_serial_error_msg computer_serial_vprint(const char* buffer, .
 
         buffer++;
     }
+    Serial.flush();
 
-    va_end(args);
     return COMPUTER_SERIAL_OK;
+}
+
+en_computer_serial_error_msg computer_serial_print_args(const char* buffer, va_list args)
+{
+    en_computer_serial_error_msg ret = computer_serial_vprint(buffer, args);
+    return ret;
 }
 
 en_computer_serial_error_msg computer_serial_print(const char* buffer, ...)
@@ -105,7 +113,19 @@ int computer_serial_read_line(uint8_t *i_buffer, uint8_t size_to_read)
     int data_read = 0;
     if (COMPUTER_SERIAL_OK == wait)
     {
-        data_read = Serial.readBytesUntil('\n', i_buffer, size_to_read);
+        while (Serial.available())
+        {
+            if (data_read < size_to_read)
+            {
+                int ch = Serial.read();
+                i_buffer[data_read++] = (uint8_t)ch;
+            }
+            else 
+            {
+                break;
+            }
+            delay(5);
+        }
     }
 
     return data_read;
@@ -135,7 +155,8 @@ en_computer_serial_error_msg computer_serial_empty_buffer(void)
 
     while (Serial.available())
     {
-        Serial.read();
+        int byte_read = Serial.read();
+        delay(10);
     }
     return err;
 }

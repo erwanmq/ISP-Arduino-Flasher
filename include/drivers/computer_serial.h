@@ -15,6 +15,7 @@ en_computer_serial_error_msg computer_serial_init(void);
 /* Used to write to the Serial */
 en_computer_serial_error_msg computer_serial_write(const uint8_t *bytes_to_write, uint8_t size_to_write);
 en_computer_serial_error_msg computer_serial_print(const char* buffer, ...);
+en_computer_serial_error_msg computer_serial_print_args(const char* buffer, va_list args);
 
 /* Used to read from the Serial */
 int computer_serial_read_line(uint8_t *i_buffer, uint8_t size_to_read);

@@ -4,11 +4,14 @@
 #include "cli/cli.h"
 #include "utils/logger.h"
 
+
 void setup ()
 {
   logger_init(LOG_DEBUG);
   computer_serial_init();
-  Serial.println("Test");
+  int free_memory = freeMemory();
+  Serial.print("Memory == ");
+  Serial.println(free_memory);
   computer_serial_print("Computer communication initialized\n");
   mcu_serial_init();
   computer_serial_print("MCU communication initialized\n");

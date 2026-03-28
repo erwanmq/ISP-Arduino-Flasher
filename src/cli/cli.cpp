@@ -161,8 +161,11 @@ en_cli_error_msg cli_program_data(void)
     int size = computer_serial_read_line(program_data, sizeof(program_data));
     computer_serial_empty_buffer();
 
+    program_data[size] = '\0';
+
     if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data(program_data, size))
     {
+        log_error("Failed to write the program data to MCU\n");
         ret = CLI_ERROR;
     }
     return ret;
@@ -175,27 +178,30 @@ en_cli_error_msg cli_display_memory(void)
     char start_address[4];
     char end_address[4];
     int byte_read = 0;
-    computer_serial_print("Enter the start address MSB: \n");
+    computer_serial_print("Enter the start address MSB: ");
+    computer_serial_empty_buffer();
     byte_read = computer_serial_read_line((uint8_t*)start_address, 2);
-    log_debug("Bytes read for start_address[0] = %d\n", byte_read);
-    computer_serial_empty_buffer();
+    computer_serial_empty_buffer();    
     
-    computer_serial_print("Enter the start address LSB: \n");
+    computer_serial_print("Enter the start address LSB: ");
+    computer_serial_empty_buffer();
     byte_read = computer_serial_read_line((uint8_t*)&start_address[2], 2);
-    log_debug("Bytes read for start_address[1] = %d\n", byte_read);
     computer_serial_empty_buffer();
 
-    computer_serial_print("Enter the end address MSB: \n");
+    computer_serial_print("Enter the end address MSB: ");
+    computer_serial_empty_buffer();
     byte_read = computer_serial_read_line((uint8_t*)end_address, 2);
-    log_debug("Bytes read for end_address[0] = %d\n", byte_read);
     computer_serial_empty_buffer();
 
-    computer_serial_print("Enter the end address LSB: \n");
-    byte_read = computer_serial_read_line((uint8_t*)&end_address[2], 2);
-    log_debug("Bytes read for end_address[1] = %d\n", byte_read);
+    computer_serial_print("Enter the end address LSB:   ");
     computer_serial_empty_buffer();
+    byte_read = computer_serial_read_line((uint8_t*)&end_address[2], 2);
+    computer_serial_empty_buffer();
+
+    delay(20);
 
     uint8_t buffer[128];
+    memset(buffer, '0', 128);
     if (AT89C51RB2_ISP_OK != at89c51rb2_display_memory(start_address, end_address, buffer, sizeof(buffer)))
     {
         ret = CLI_ERROR;
@@ -203,8 +209,7 @@ en_cli_error_msg cli_display_memory(void)
 
     if (CLI_OK == ret)
     {
-        computer_serial_print("Memory is:\n");
-        computer_serial_print((const char*)buffer);
+        computer_serial_print("Memory is: %s\n", (const char*)buffer);
     }
     else 
     {

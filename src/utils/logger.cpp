@@ -21,7 +21,7 @@ void log_error(const char* buffer, ...)
         va_list args;
         va_start(args, buffer);
         computer_serial_print("ERROR: ");
-        computer_serial_print(buffer, args);
+        computer_serial_print_args(buffer, args);
         va_end(args);
     }
 }
@@ -33,7 +33,7 @@ void log_warning(const char* buffer, ...)
         va_list args;
         va_start(args, buffer);
         computer_serial_print("WARNING: ");
-        computer_serial_print(buffer, args);
+        computer_serial_print_args(buffer, args);
         va_end(args);
     }
 }
@@ -45,7 +45,7 @@ void log_debug(const char* buffer, ...)
         va_list args;
         va_start(args, buffer);
         computer_serial_print("DEBUG: ");
-        computer_serial_print(buffer, args);
+        computer_serial_print_args(buffer, args);
         va_end(args);
     }
 }
