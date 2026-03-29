@@ -276,6 +276,9 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *b
     const uint8_t MAX_PAGE_SIZE = 128;
     const uint8_t *data = buffer;
 
+    Serial.print("Base size == ");
+    Serial.println(size);
+
     /* Check if the data will cross a page boundary */
     const uint16_t end_position = address + size;
     const uint16_t page_pos     = address / MAX_PAGE_SIZE + 1;
@@ -284,32 +287,20 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *b
         Serial.println("Cross a page");
         /* Split the data in 2 chunks */
         const uint16_t size_until_page = MAX_PAGE_SIZE * page_pos - address;
-        Serial.println("Left...");
-        for (int i = 0; i < size_until_page; i++)
-        {
-            Serial.print(data[i]);
-            Serial.print(" ");
-        }
-        Serial.println("");
+
         /* Left part */
         /* size * 2 because 1 data is 2 ascii */
         if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size_until_page, address))
         {
+            Serial.println("Error 1");
             ret = AT89C51RB2_ISP_ERROR;
         } 
         /* New address */
         address = MAX_PAGE_SIZE * page_pos;
+        Serial.print("New address: ");
+        Serial.println(address);
         size    = size - size_until_page;
         data    = &buffer[size_until_page]; // Increase the pointer pos 
-
-        Serial.print("Right... size == ");
-        Serial.println(size);
-        for (int i = 0; i < size; i++)
-        {
-            Serial.print(data[i]);
-            Serial.print(" ");
-        }
-        Serial.println("");
         
         /* Right part */
         if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size, address))
@@ -327,20 +318,12 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *b
         {
             uint16_t j = 0;
             uint8_t new_size = 0;
-            for (uint16_t i = 0; i < size; i += 2)
+            for (uint16_t i = 0; i < size * 2; i += 2)
             {
                 data_processed[j + 1] = ascii_to_byte((const char*)&data[i]);
                 new_size = j + 2;
                 j++;
             }
-
-            Serial.println("Writing...");
-            for (int i = 0; i < new_size; i++)
-            {
-                Serial.print(data_processed[i]);
-                Serial.print(" ");
-            }
-            Serial.println("");
 
             if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data_processed, new_size, address)) // + 1 because there is PROGRAM_DATA_FCT now
             {
@@ -379,8 +362,7 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data(const uint8_t *buffer,
 
         const uint8_t *data = &buffer[offset + 9];
 
-        /* byte_count * 2 because one data is 2 ascii */
-        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, byte_count * 2, address))
+        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, byte_count, address))
         {
             Serial.print("Write data chunk fail\n");
             ret = AT89C51RB2_ISP_ERROR;
