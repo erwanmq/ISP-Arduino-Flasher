@@ -30,6 +30,6 @@ en_at89c51rb2_isp_error_msg at89c51rb2_read_id(uint8_t buffer[2]);
 en_at89c51rb2_isp_error_msg at89c51rb2_read_ssb(uint8_t buffer[2]);
 en_at89c51rb2_isp_error_msg at89c51rb2_read_hardware_bytes(uint8_t *buffer);
 
-en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[2], const char end_address[2], uint8_t *i_buffer, int size_buffer);
+en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[2], const char end_address[2], uint8_t *i_buffer, uint8_t size_buffer);
 
 #endif /* PROTOCOL_AT89C51RB2_H__ */

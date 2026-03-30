@@ -1,6 +1,5 @@
 #include "protocol/at89c51rb2_isp.h"
 #include "drivers/mcu_serial.h"
-#include "utils/logger.h"
 
 #define DELAY_FOR_STABILITY 5000
 #define DELAY_BOOTTIME 10000
@@ -78,8 +77,8 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_write_and_check(const uint8_t *buf
         err = mcu_serial_write(&buffer[i], 1);
         if (MCU_SERIAL_OK != err)
         {
+            Serial.print("FAiled to mcu serial write");
             ret = AT89C51RB2_ISP_ERROR;
-            log_error("Failed to write to mcu from write_and_check");
             break;
         }
 
@@ -89,15 +88,11 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_write_and_check(const uint8_t *buf
         if (MCU_SERIAL_OK != err || 1 != byte_read)
         {
             ret = AT89C51RB2_ISP_ERROR;
-            log_error("Failed read back from mcu from write_and_check. Error: %d\n", (int)err);
             break;
         }
         if (echo != buffer[i])
         {
             ret = AT89C51RB2_ISP_ERROR;
-            log_error("Failed echo from write_and_check\n");
-            log_debug("ECHO VALUE == %d\n", echo);
-            log_debug("REAL VALUE == %d\n", buffer[i]);
             break;
         }
     }
@@ -128,7 +123,6 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_write_and_check(const uint8_t *buf
         if (status_error)
         {
             ret = AT89C51RB2_ISP_ERROR;
-            log_error("status error write_and_check");
         }
     }
 
@@ -145,18 +139,19 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_create_frame_header_and_write(cons
                                          uint16_t address)
 {
     const uint8_t record_mark = ':';
-    uint8_t address_8bits[2] = { ((uint8_t)address >> 8) & 0x0F, (uint8_t)address & 0x0F };
-
+    uint8_t address_8bits[2] = { ((uint8_t)(address >> 8)), (uint8_t)(address) };
     uint8_t reclen = size - 1; // We don't count the command
     uint8_t checksum = 0;
-    for (int i = 0; i < (int)size; i++)
+    for (uint8_t i = 0; i < size; i++)
     {
         checksum += buffer[i];
     }
     checksum += reclen;
+    checksum += address_8bits[0];
+    checksum += address_8bits[1];
     checksum = 256 - checksum;
 
-    const size_t MAX_FRAME_SIZE = 256;
+    const uint16_t MAX_FRAME_SIZE = 256;
     char bytes_with_frame[MAX_FRAME_SIZE];
 
     uint8_t offset = 0;
@@ -165,13 +160,22 @@ static en_at89c51rb2_isp_error_msg at89c51rb2_create_frame_header_and_write(cons
     byte_to_ascii(address_8bits[0], &bytes_with_frame[offset]); offset += 2;
     byte_to_ascii(address_8bits[1], &bytes_with_frame[offset]); offset += 2;
 
-    for (int i = 0; i < (int)size; i++)
+    for (uint8_t i = 0; i < size; i++)
     {
         byte_to_ascii(buffer[i], &bytes_with_frame[offset]);
         offset += 2;
     }
 
     byte_to_ascii(checksum, &bytes_with_frame[offset]); offset += 2;
+
+    Serial.println("PRINT:");
+    for (int i = 0; i < offset; i++)
+    {
+        Serial.print(bytes_with_frame[i]);
+        Serial.print(" ");
+    }
+    Serial.println("");
+
 
     return at89c51rb2_write_and_check((uint8_t*)bytes_with_frame, offset);
 }
@@ -231,7 +235,7 @@ en_at89c51rb2_isp_error_msg at89c51rb2_finish_flash(void)
         ret = AT89C51RB2_ISP_ERROR;
     }
 
-    const  uint8_t data2[] = {
+    const uint8_t data2[] = {
         WRITE_FCT,
         WRITE_BSB_SBV,
         WRITE_BSB,
@@ -268,46 +272,60 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *b
                            uint8_t size,
                            uint16_t address)
 {
-    Serial.println("Data chunk");
-
-    delay(20);
     en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
-    const int MAX_PAGE_SIZE = 128;
+    const uint8_t MAX_PAGE_SIZE = 128;
     const uint8_t *data = buffer;
+
+    Serial.print("Base size == ");
+    Serial.println(size);
 
     /* Check if the data will cross a page boundary */
     const uint16_t end_position = address + size;
     const uint16_t page_pos     = address / MAX_PAGE_SIZE + 1;
     if (address < (MAX_PAGE_SIZE * page_pos) && end_position > (MAX_PAGE_SIZE * page_pos)) // Cross a page
     {
+        Serial.println("Cross a page");
         /* Split the data in 2 chunks */
         const uint16_t size_until_page = MAX_PAGE_SIZE * page_pos - address;
 
         /* Left part */
         /* size * 2 because 1 data is 2 ascii */
-        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size_until_page * 2, address))
+        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size_until_page, address))
         {
+            Serial.println("Error 1");
             ret = AT89C51RB2_ISP_ERROR;
         } 
         /* New address */
         address = MAX_PAGE_SIZE * page_pos;
+        Serial.print("New address: ");
+        Serial.println(address);
         size    = size - size_until_page;
         data    = &buffer[size_until_page]; // Increase the pointer pos 
         
         /* Right part */
-        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size * 2, address))
+        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size, address))
         {
+            Serial.println("Error 2");
             ret = AT89C51RB2_ISP_ERROR;
         }
     }
     else 
     {
-        uint8_t data_processed[MAX_PAGE_SIZE];
+        uint8_t data_processed[64];
         data_processed[0] = PROGRAM_DATA_FCT;
-        if (MAX_PAGE_SIZE > size)
+
+        if (64 > size)
         {
-            memcpy(&data_processed[1], data, size * 2);
-            if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data_processed, size * 2, address))
+            uint16_t j = 0;
+            uint8_t new_size = 0;
+            for (uint16_t i = 0; i < size * 2; i += 2)
+            {
+                data_processed[j + 1] = ascii_to_byte((const char*)&data[i]);
+                new_size = j + 2;
+                j++;
+            }
+
+            if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data_processed, new_size, address)) // + 1 because there is PROGRAM_DATA_FCT now
             {
                 ret = AT89C51RB2_ISP_ERROR;
             }
@@ -329,12 +347,11 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data(const uint8_t *buffer,
         return AT89C51RB2_ISP_ERROR;
     }
 
-    int offset = 0;
+    uint16_t offset = 0;
     while (size > offset)
     {
         if (':' != buffer[offset + 0])
         {
-            Serial.print("Break\n");
             break;
         }
 
@@ -344,17 +361,13 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data(const uint8_t *buffer,
         uint16_t address = (((uint16_t)address_msb << 8) | (uint16_t)address_lsb);
 
         const uint8_t *data = &buffer[offset + 9];
-        int free_memory = freeMemory();
-        Serial.print("Memory == ");
-        Serial.println(free_memory);
-        /* byte_count * 2 because one data is 2 ascii */
-        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, byte_count * 2, address))
+
+        if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, byte_count, address))
         {
             Serial.print("Write data chunk fail\n");
             ret = AT89C51RB2_ISP_ERROR;
             break;
         }
-        Serial.print("Increase offset\n");
 
         offset += 9 + byte_count * 2 + 2; // header + data + checksum
     }
@@ -453,7 +466,7 @@ en_at89c51rb2_isp_error_msg at89c51rb2_read_hardware_bytes(uint8_t buffer[4])
     return ret;
 }
 
-en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[4], const char end_address[4], uint8_t *i_buffer, int size_buffer)
+en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[4], const char end_address[4], uint8_t *i_buffer, uint8_t size_buffer)
 {
     en_at89c51rb2_isp_error_msg ret = AT89C51RB2_ISP_OK;
     uint8_t start_address_byte[2] = { ascii_to_byte(&start_address[0]), ascii_to_byte(&start_address[2]) };
@@ -468,7 +481,7 @@ en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[4
 
     if (AT89C51RB2_ISP_OK != at89c51rb2_create_frame_header_and_write(data, sizeof(data), 0))
     {
-        log_error("Failed to create and write to MCU\n");
+        Serial.println("Failed to write and check in display memory");
         ret = AT89C51RB2_ISP_ERROR;
     }
 
@@ -477,7 +490,6 @@ en_at89c51rb2_isp_error_msg at89c51rb2_display_memory(const char start_address[4
         if (AT89C51RB2_ISP_OK != at89c51rb2_read_data(i_buffer, size_buffer))
         {
             ret = AT89C51RB2_ISP_ERROR;
-            log_error("Failed to data from MCU\n");
         }
     }
 
