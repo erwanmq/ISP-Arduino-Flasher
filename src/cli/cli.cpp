@@ -45,6 +45,7 @@ void cli_init(void)
                 command_table[i].description);
         computer_serial_print(line);
     }
+    computer_serial_print(">");
 }
 
 void cli_task(void)
@@ -184,7 +185,7 @@ en_cli_error_msg cli_program_data(void)
 {
     en_cli_error_msg ret = CLI_OK;
 
-    computer_serial_print("Enter your hex intel data in one row with the semicolon: ");
+    computer_serial_print("Enter your hex intel data in one row with the semicolon >");
 
     uint8_t program_data[64] = { 0 };
     int size = computer_serial_read_line(program_data, sizeof(program_data));
