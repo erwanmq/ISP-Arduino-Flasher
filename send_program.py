@@ -1,7 +1,7 @@
 import pexpect
 import argparse
 
-def parse_arguments():
+def parse_arguments() -> None:
     """
     Parse command-line arguments.
     Returns:
