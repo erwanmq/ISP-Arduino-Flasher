@@ -20,10 +20,10 @@ def parse_arguments() -> None:
     return args
 
 def send_data(data: str) -> None:
-    child = pexpect.spawn('pio device monitor')
+    print(data)
+    return
     
     child.expect(">")
-    print("Program connected")
     print(child.before)
     
     
@@ -39,4 +39,8 @@ def send_data(data: str) -> None:
 
 if __name__ == "__main__":
     args = parse_arguments()
-    send_data(args.program_data)
+    filename = args.program_data;
+    with open(filename , "r") as f:
+        child = pexpect.spawn('pio device monitor')
+        for line in f:
+            send_data(line)
