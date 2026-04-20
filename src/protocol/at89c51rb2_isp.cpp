@@ -278,6 +278,8 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *b
 
     Serial.print("Base size == ");
     Serial.println(size);
+    
+
 
     /* Check if the data will cross a page boundary */
     const uint16_t end_position = address + size;
@@ -295,12 +297,29 @@ en_at89c51rb2_isp_error_msg at89c51rb2_write_program_data_chunk(const uint8_t *b
             Serial.println("Error 1");
             ret = AT89C51RB2_ISP_ERROR;
         } 
+
+        Serial.print("Data to send: ");
+        for (int i = 0; i < size * 2; i++)
+        {
+            Serial.print(data[i]);
+            Serial.print(" ");
+        }
+        Serial.println("");
+
         /* New address */
         address = MAX_PAGE_SIZE * page_pos;
         Serial.print("New address: ");
         Serial.println(address);
         size    = size - size_until_page;
-        data    = &buffer[size_until_page]; // Increase the pointer pos 
+        data    = &buffer[size_until_page * 2]; // Increase the pointer pos + 1 for ':' + 9 for header 
+
+        Serial.print("Data to send: ");
+        for (int i = 0; i < size * 2; i++)
+        {
+            Serial.print(data[i]);
+            Serial.print(" ");
+        }
+        Serial.println("");
         
         /* Right part */
         if (AT89C51RB2_ISP_OK != at89c51rb2_write_program_data_chunk(data, size, address))

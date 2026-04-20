@@ -205,22 +205,22 @@ en_cli_error_msg cli_display_memory(void)
     char start_address[4];
     char end_address[4];
     int byte_read = 0;
-    computer_serial_print("Enter the start address MSB: ");
+    computer_serial_print("Enter the start address MSB>");
     computer_serial_empty_buffer();
     byte_read = computer_serial_read_line((uint8_t*)start_address, 2);
     computer_serial_empty_buffer();    
     
-    computer_serial_print("Enter the start address LSB: ");
+    computer_serial_print("Enter the start address LSB>");
     computer_serial_empty_buffer();
     byte_read = computer_serial_read_line((uint8_t*)&start_address[2], 2);
     computer_serial_empty_buffer();
 
-    computer_serial_print("Enter the end address MSB: ");
+    computer_serial_print("Enter the end address MSB>");
     computer_serial_empty_buffer();
     byte_read = computer_serial_read_line((uint8_t*)end_address, 2);
     computer_serial_empty_buffer();
 
-    computer_serial_print("Enter the end address LSB:   ");
+    computer_serial_print("Enter the end address LSB>");
     computer_serial_empty_buffer();
     byte_read = computer_serial_read_line((uint8_t*)&end_address[2], 2);
     computer_serial_empty_buffer();
