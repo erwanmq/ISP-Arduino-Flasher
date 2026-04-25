@@ -53,7 +53,7 @@ def get_display_memory_values(pexpect_output: str) -> list[str]:
     return re.findall(pattern, pexpect_output)
 
 
-def verify_data(data: str) -> None:
+def verify_data(data: str) -> int:
     address = data[3:7]
     child.sendline("6")
 
@@ -81,8 +81,10 @@ def verify_data(data: str) -> None:
     print("\n\n")
     if displayed_memory != data[9:-3]:
         print(f"The data failed to verify.\nWanted: {data[9:-3]} - Found: {displayed_memory}")
+        return -1
     else: 
         print(f"The data are verified.\nWanted: {data[9:-3]} - Found: {displayed_memory}")
+        return 0
     
     print("\n\n")
 
@@ -111,15 +113,24 @@ if __name__ == "__main__":
         print("Chip full erased!")
         with open(filename , "r") as f:
             for line in f:
+                if ":00000001FF" == line:
+                    break
                 send_data(line)
         child.sendline("7")
         print("MCU ready to be used!")
 
     filename = args.verify_data
     if filename is not None:
+        line_failed = 0
         with open(filename , "r") as f:
             child = pexpect.spawn('pio device monitor')
             child.expect(">")
             for line in f:
-                verify_data(line)
+                if ":00000001FF" in line:
+                    break
+                if -1 == verify_data(line):
+                    line_failed += 1
+
+        print(f"{line_failed} lines failed")
+
 
