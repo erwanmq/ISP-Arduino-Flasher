@@ -12,6 +12,7 @@ typedef enum
 
 /* Bootloader control */
 en_at89c51rb2_isp_error_msg at89c51rb2_enter_bootloader(void);
+en_at89c51rb2_isp_error_msg at89c51rb2_reset_and_run(void);
 en_at89c51rb2_isp_error_msg at89c51rb2_finish_flash(void);
 
 /* Erase */

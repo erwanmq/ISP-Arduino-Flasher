@@ -255,7 +255,15 @@ en_cli_error_msg cli_finish_flash(void)
 
     if (CLI_OK == ret)
     {
-        computer_serial_print("Flash finished, you can disconnect the MCU\n");
+        computer_serial_print("Flash finished, restarting MCU...\n");
+        if (AT89C51RB2_ISP_OK == at89c51rb2_reset_and_run())
+        {
+            computer_serial_print("MCU restarted!\n");
+        }
+        else 
+        {
+            computer_serial_print("Failed to restart MCU...\n");
+        }
     }
     else 
     {

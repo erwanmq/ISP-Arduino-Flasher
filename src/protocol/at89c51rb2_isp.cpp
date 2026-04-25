@@ -216,6 +216,16 @@ en_at89c51rb2_isp_error_msg at89c51rb2_enter_bootloader(void)
     return at89c51rb2_write_and_check(&data, 1);
 }
 
+/* Reset MCU and let it run the application */
+en_at89c51rb2_isp_error_msg at89c51rb2_reset_and_run(void)
+{
+    digitalWrite(MCU_RST_PIN, HIGH);
+    delay_without_cpu_stop(DELAY_FOR_STABILITY);
+    digitalWrite(MCU_RST_PIN, LOW);
+
+    return AT89C51RB2_ISP_OK; 
+}
+
 /* 1 = User's application
 
    0 = Bootloader
