@@ -112,7 +112,11 @@ if __name__ == "__main__":
         child.expect(">")
         print("Chip full erased!")
         with open(filename , "r") as f:
-            for line in f:
+            lines = f.readlines()
+            total_lines = len(lines)
+            for i, line in enumerate(lines):
+                percentage = (i / total_lines) * 100
+                print(f"Progress: {percentage:.2f}%")
                 if ":00000001FF" == line:
                     break
                 send_data(line)
